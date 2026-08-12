@@ -102,7 +102,7 @@
         </div>
         
         <div style="font-size: 11px; color: #64748b; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
-            📍 <b>Tipp:</b> Klicke auf eine Region für einen <b>20 km Bedarfs-Check</b>!
+            📍 <b>Tipp:</b> Klicke auf eine Region für einen <b>50 km Bedarfs-Check</b>!
         </div>
     </div>
 
@@ -375,12 +375,12 @@
 
             const popupContent = `
                 <div class="popup-header">
-                    <h4>Regionaler 20 km Bedarfs-Check</h4>
+                    <h4>Regionaler 50 km Bedarfs-Check</h4>
                     <p>Auswertung für die gewählte Region</p>
                 </div>
                 <div class="popup-body">
                     <span class="badge" style="background-color: ${badgeColor}; width:100%; text-align:center;">
-                        ${nearbyCenters.length} Center im 20 km Radius
+                        ${nearbyCenters.length} Center im 50 km Radius
                     </span>
                     
                     <div class="radius-info-box">
@@ -388,7 +388,7 @@
                     </div>
 
                     ${nearbyCenters.length > 0 ? `
-                        <div class="section-title" style="margin-top:10px;">Partner im 20 km Radius:</div>
+                        <div class="section-title" style="margin-top:10px;">Partner im 50 km Radius:</div>
                         <div style="max-height:120px; overflow-y:auto;">
                             ${centerListHtml}
                         </div>

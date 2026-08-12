@@ -6,103 +6,56 @@
     <title>Franchise Bedarfs- & Potenzialanalyse Deutschland</title>
 
     <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
     <style>
         * { box-sizing: border-box; }
-        html, body {
-            margin: 0; padding: 0; height: 100%; width: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
-            background-color: #f8f9fa;
-        }
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; background-color: #f8f9fa; }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
-        /* Control Panel oben rechts */
         .filter-container {
             position: absolute; top: 20px; right: 20px; z-index: 1000;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.98); backdrop-filter: blur(8px);
             padding: 18px 22px; border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-            width: 320px; border: 1px solid rgba(0,0,0,0.08);
-            max-height: 90vh; overflow-y: auto;
+            width: 330px; border: 1px solid rgba(0,0,0,0.08);
+            max-height: 85vh; overflow-y: auto;
         }
-        .filter-container h3 {
-            margin: 0 0 12px 0; font-size: 16px; color: #1e293b;
-            font-weight: 700; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .search-box {
-            width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1;
-            border-radius: 6px; margin-bottom: 12px; font-size: 13px;
-            outline: none; transition: border-color 0.2s;
-        }
-        .search-box:focus { border-color: #3b82f6; }
+        .filter-container h3 { margin: 0 0 12px 0; font-size: 16px; color: #1e293b; font-weight: 700; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .search-box { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 12px; font-size: 13px; outline: none; }
         .filter-group { margin-bottom: 10px; display: flex; align-items: center; }
-        .filter-group label {
-            font-size: 13px; cursor: pointer; color: #334155;
-            display: flex; align-items: center; user-select: none; font-weight: 500;
-        }
+        .filter-group label { font-size: 13px; cursor: pointer; color: #334155; display: flex; align-items: center; user-select: none; font-weight: 500; }
         .filter-group input { margin-right: 10px; cursor: pointer; width: 16px; height: 16px; }
-        .dot {
-            height: 12px; width: 12px; border-radius: 50%;
-            display: inline-block; margin-right: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        }
+        .dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
         .dot-generell { background-color: #ef4444; }
         .dot-nur-heavy { background-color: #f97316; }
         .dot-kein-heavy { background-color: #3b82f6; }
         .dot-kein-bedarf { background-color: #10b981; }
 
-        /* Detail-Popup Styling */
-        .leaflet-popup-content-wrapper {
-            border-radius: 12px; padding: 0; overflow: hidden;
-            box-shadow: 0 12px 28px rgba(0,0,0,0.22);
-            width: 350px !important;
+        .status-box {
+            position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+            background: #0f172a; color: #f8fafc; padding: 10px 14px; border-radius: 8px;
+            font-size: 12px; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
+
+        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; box-shadow: 0 12px 28px rgba(0,0,0,0.22); width: 350px !important; }
         .leaflet-popup-content { margin: 0 !important; width: 350px !important; line-height: 1.4; }
-        
-        .popup-header {
-            padding: 14px 16px; color: white; background: #1e293b;
-        }
+        .popup-header { padding: 14px 16px; color: white; background: #1e293b; }
         .popup-header h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; }
-        .popup-header p { margin: 0; font-size: 12px; opacity: 0.85; }
-        
         .popup-body { padding: 14px 16px; max-height: 380px; overflow-y: auto; }
-        .badge {
-            display: inline-block; padding: 4px 10px; border-radius: 20px;
-            font-size: 11px; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.5px; margin-bottom: 12px; color: white;
-        }
-
-        .section-title {
-            font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;
-            letter-spacing: 0.5px; margin: 12px 0 6px 0; border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 3px;
-        }
-
-        .service-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px;
-        }
-        .service-item {
-            display: flex; align-items: center; padding: 4px 6px; border-radius: 4px;
-        }
-        .service-item.missing {
-            background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;
-        }
-        .service-item.available {
-            background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;
-        }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: white; }
+        
+        .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 6px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+        .service-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 12px; }
+        .service-item { display: flex; align-items: center; padding: 4px 6px; border-radius: 4px; }
+        .service-item.missing { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .service-item.available { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
         .service-icon { margin-right: 6px; font-size: 13px; font-weight: bold; }
 
         .stat-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
         .stat-label { color: #64748b; }
         .stat-val { font-weight: 600; color: #0f172a; }
-
-        .status-pill {
-            background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
-        }
+        .status-pill { background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -110,7 +63,7 @@
     <div class="filter-container">
         <h3>
             <span>Bedarf & Filter</span>
-            <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">0 Standorte</span>
+            <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lädt...</span>
         </h3>
         
         <input type="text" id="searchInput" class="search-box" placeholder="Suche Ort, PLZ oder Kennung..." onkeyup="filterMap()">
@@ -129,24 +82,29 @@
         </div>
     </div>
 
+    <div class="status-box" id="statusBox">Verbinde mit Google Sheets...</div>
     <div id="map"></div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-        // Euer Live CSV Link aus Google Sheets
-        const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFDiufFtP3EnpKNdGI6f8Kk1HaZoEzUCC79DnLdtqOSkzzs0eejgEypkw23MzIbyM4be4G63yGhhuN/pub?output=csv';
+        // Euer pubhtml Link - wird automatisch in den Datenstream umgestellt
+        const PUBHTML_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFDiufFtP3EnpKNdGI6f8Kk1HaZoEzUCC79DnLdtqOSkzzs0eejgEypkw23MzIbyM4be4G63yGhhuN/pubhtml';
+        const STREAM_URL = PUBHTML_URL.replace('/pubhtml', '/pub?output=csv');
 
         let map;
         let allMarkers = [];
+
+        function setStatus(msg) {
+            document.getElementById('statusBox').innerHTML = msg;
+        }
 
         function initMap() {
             map = L.map('map', { zoomControl: true }).setView([51.1657, 10.4515], 6);
 
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
                 attribution: '&copy; OpenStreetMap & CartoDB',
-                subdomains: 'abcd',
                 maxZoom: 19
             }).addTo(map);
 
@@ -154,23 +112,77 @@
         }
 
         function loadSheetData() {
-            Papa.parse(GOOGLE_SHEET_CSV_URL, {
+            Papa.parse(STREAM_URL, {
                 download: true,
-                header: true,
+                header: false, // Wichtig: Erst als Roh-Array laden wegen eures zweizeiligen Tabellenkopfs
                 skipEmptyLines: true,
                 complete: function(results) {
-                    processData(results.data);
+                    processRawMatrix(results.data);
                 },
                 error: function(err) {
-                    console.error("Fehler beim Laden:", err);
+                    setStatus("❌ Fehler beim Laden der Google-Sheet-Daten.");
+                    console.error(err);
                 }
             });
         }
 
-        // Hilfsfunktion zur Prüfung von Ja / Nein Spalten
+        function processRawMatrix(matrix) {
+            if (!matrix || matrix.length < 2) {
+                setStatus("⚠️ Tabelle ist leer.");
+                return;
+            }
+
+            // Suche die ECHTE Header-Zeile (Zeile mit PLZ, Ort, Lat.Long.)
+            let headerIdx = -1;
+            for (let i = 0; i < Math.min(5, matrix.length); i++) {
+                let lineStr = matrix[i].join(' ').toLowerCase();
+                if (lineStr.includes('ort') || lineStr.includes('plz') || lineStr.includes('lat')) {
+                    headerIdx = i;
+                    break;
+                }
+            }
+
+            if (headerIdx === -1) headerIdx = 0;
+
+            const headers = matrix[headerIdx].map(h => h ? h.trim() : '');
+            const dataRows = matrix.slice(headerIdx + 1);
+
+            let count = 0;
+
+            dataRows.forEach(rowArr => {
+                let row = {};
+                headers.forEach((h, idx) => {
+                    if (h) row[h] = rowArr[idx] ? rowArr[idx].trim() : '';
+                });
+
+                // Spalte "Lat.Long." herauslesen
+                let coordsRaw = row['Lat.Long.'] || row['Lat. Long.'] || row['Lat,Long'] || '';
+                let lat = NaN, lng = NaN;
+
+                if (coordsRaw && coordsRaw.includes(',')) {
+                    let parts = coordsRaw.split(',');
+                    lat = parseFloat(parts[0].replace(',', '.').trim());
+                    lng = parseFloat(parts[1].replace(',', '.').trim());
+                }
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    count++;
+                    addMarkerToMap(row, lat, lng);
+                }
+            });
+
+            if (count > 0) {
+                setStatus(`✅ <b>${count} Standorte erfolgreich geladen!</b>`);
+                document.getElementById('counter').innerText = `${count} Standorte`;
+                filterMap();
+            } else {
+                setStatus("⚠️ Keine Standorte mit Auswertbaren Koordinaten gefunden.");
+            }
+        }
+
         function checkVal(val) {
             if (!val) return false;
-            const v = val.toString().trim().toLowerCase();
+            let v = val.toString().trim().toLowerCase();
             return v === 'ja' || v === '1' || v === 'x' || v === 'true';
         }
 
@@ -180,8 +192,8 @@
             const kamHeavy = checkVal(row['KAM Heavy']);
             const hasHeavyNeed = vklHeavy || vadHeavy || kamHeavy;
 
-            const kapazitaetLight = row['Kapazität im light Bereich (inkl. SMR)'] ? row['Kapazität im light Bereich (inkl. SMR)'].toString().trim().toLowerCase() : '';
-            const hasLightNeed = kapazitaetLight === 'ja' || (kapazitaetLight !== '0' && kapazitaetLight !== 'nein' && kapazitaetLight !== '');
+            const kapLightVal = row['Kapazität im light Bereich (inkl. SMR)'] ? row['Kapazität im light Bereich (inkl. SMR)'].toString().trim().toLowerCase() : '';
+            const hasLightNeed = kapLightVal === 'ja' || (kapLightVal !== '0' && kapLightVal !== 'nein' && kapLightVal !== '');
 
             if (hasHeavyNeed && hasLightNeed) {
                 return 'Genereller Bedarf';
@@ -204,91 +216,75 @@
             }
         }
 
-        function processData(data) {
-            let count = 0;
-            data.forEach(row => {
-                let lat, lng;
-                const coordsRaw = row['Lat.Long.'] || row['Lat. Long.'] || row['Lat,Long'];
-                
-                if (coordsRaw && coordsRaw.includes(',')) {
-                    const coords = coordsRaw.split(',');
-                    lat = parseFloat(coords[0].trim());
-                    lng = parseFloat(coords[1].trim());
-                } else if (row['Lat'] && row['Long']) {
-                    lat = parseFloat(row['Lat']);
-                    lng = parseFloat(row['Long']);
-                }
+        function addMarkerToMap(row, lat, lng) {
+            const bedarfStatus = getBedarfStatus(row);
+            const color = getColor(bedarfStatus);
 
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    count++;
-                    const bedarfStatus = getBedarfStatus(row);
-                    const color = getColor(bedarfStatus);
-
-                    const marker = L.circleMarker([lat, lng], {
-                        radius: 8,
-                        fillColor: color,
-                        color: "#ffffff",
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.88
-                    });
-
-                    // Auswertung was vorhanden ist und was FEHLT
-                    const services = [
-                        { name: 'Autoservice PKW', active: checkVal(row['Autoservice']) },
-                        { name: 'Reifenservice PKW', active: checkVal(row['Reifenservice']) },
-                        { name: 'Autoglas', active: checkVal(row['Autoglas']) },
-                        { name: 'Hochvolt / EV', active: checkVal(row['EV / Hochvolt']) || checkVal(row['Hochvolt-Ausstattung (Messgerät, Absperrmaterial, PSA Hochvolt)']) },
-                        { name: 'LKW Reifenservice', active: checkVal(row['Rad- Reifen Service (LKW)']) },
-                        { name: 'LKW Autoservice', active: checkVal(row['Autoservice (LKW)']) },
-                        { name: 'LKW Hebebühne', active: checkVal(row['Hebebühne vorhanden (LKW)']) },
-                        { name: 'Mobiler Service', active: checkVal(row['Mobiler Service']) || checkVal(row['Breakdown Service']) }
-                    ];
-
-                    let serviceHTML = '';
-                    services.forEach(s => {
-                        const statusClass = s.active ? 'available' : 'missing';
-                        const icon = s.active ? '✓' : '✗';
-                        serviceHTML += `<div class="service-item ${statusClass}"><span class="service-icon">${icon}</span>${s.name}</div>`;
-                    });
-
-                    const popupContent = `
-                        <div class="popup-header">
-                            <h4>${row['Ort'] || 'Standort'} ${row['PLZ'] ? '(' + row['PLZ'] + ')' : ''}</h4>
-                            <p>${row['Gesellschaft'] || row['Straße'] || 'Euromaster Standort'}</p>
-                        </div>
-                        <div class="popup-body">
-                            <span class="badge" style="background-color: ${color};">${bedarfStatus}</span>
-                            
-                            <div class="stat-row"><span class="stat-label">Netzkennung / ID:</span><span class="stat-val">${row['Netzkennung'] || row['Standort ID'] || 'N/A'}</span></div>
-                            <div class="stat-row"><span class="stat-label">Netzwerk-Typ:</span><span class="stat-val"><span class="status-pill">${row['BUStatus'] || row['Gesellschaft'] || 'Franchise'}</span></span></div>
-                            <div class="stat-row"><span class="stat-label">Anzahl Hebebühnen:</span><span class="stat-val">${row['Anzahl Hebebühnen'] || '0'}</span></div>
-                            <div class="stat-row"><span class="stat-label">LLKW Bühnen (>3.5t):</span><span class="stat-val">${row['Anzahl Hebebühnen > 3,5T'] || '0'}</span></div>
-
-                            <div class="section-title">Angebots- & Lückenanalyse</div>
-                            <div class="service-grid">
-                                ${serviceHTML}
-                            </div>
-
-                            <div class="section-title" style="margin-top:10px;">Geforderte Kapazitäten</div>
-                            <div class="stat-row"><span class="stat-label">VKL Heavy Bedarf:</span><span class="stat-val">${row['VKL Heavy'] || 'Nein'}</span></div>
-                            <div class="stat-row"><span class="stat-label">Kapazität Light:</span><span class="stat-val">${row['Kapazität im light Bereich (inkl. SMR)'] || 'N/A'}</span></div>
-                        </div>
-                    `;
-
-                    marker.bindPopup(popupContent);
-
-                    allMarkers.push({
-                        marker: marker,
-                        status: bedarfStatus,
-                        text: `${row['Ort']} ${row['PLZ']} ${row['Netzkennung']} ${row['Straße']}`.toLowerCase()
-                    });
-
-                    marker.addTo(map);
-                }
+            const marker = L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: color,
+                color: "#ffffff",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.88
             });
 
-            document.getElementById('counter').innerText = `${count} Standorte`;
+            const ort = row['Ort'] || 'Standort';
+            const plz = row['PLZ'] || '';
+            const strasse = row['Straße'] || row['Strasse'] || '';
+            const netzkennung = row['Netzkennung'] || row['KST'] || 'N/A';
+            const status = row['BUStatus'] || row['Gesellschaft'] || 'Franchise';
+
+            // Angebots- & Lückenanalyse (Was da ist = Grüne Häkchen, Was fehlt = Rote Kreuze)
+            const services = [
+                { name: 'Autoservice PKW', active: checkVal(row['Autoservice']) },
+                { name: 'Reifenservice PKW', active: checkVal(row['Reifenservice']) },
+                { name: 'Autoglas', active: checkVal(row['Autoglas']) },
+                { name: 'Hochvolt / EV', active: checkVal(row['EV / Hochvolt']) || checkVal(row['Hochvolt-Ausstattung (Messgerät, Absperrmaterial, PSA Hochvolt)']) },
+                { name: 'LKW Reifenservice', active: checkVal(row['Rad- Reifen Service (LKW)']) },
+                { name: 'LKW Autoservice', active: checkVal(row['Autoservice (LKW)']) },
+                { name: 'LKW Hebebühne', active: checkVal(row['Hebebühne vorhanden (LKW)']) },
+                { name: 'Mobiler Service', active: checkVal(row['Mobiler Service']) || checkVal(row['Breakdown Service']) }
+            ];
+
+            let serviceHTML = '';
+            services.forEach(s => {
+                const statusClass = s.active ? 'available' : 'missing';
+                const icon = s.active ? '✓' : '✗';
+                serviceHTML += `<div class="service-item ${statusClass}"><span class="service-icon">${icon}</span>${s.name}</div>`;
+            });
+
+            const popupContent = `
+                <div class="popup-header">
+                    <h4>${ort} ${plz ? '(' + plz + ')' : ''}</h4>
+                    <p>${strasse || 'Euromaster Standort'}</p>
+                </div>
+                <div class="popup-body">
+                    <span class="badge" style="background-color: ${color};">${bedarfStatus}</span>
+                    
+                    <div class="stat-row"><span class="stat-label">Netzkennung / ID:</span><span class="stat-val">${netzkennung}</span></div>
+                    <div class="stat-row"><span class="stat-label">Netzwerk-Typ:</span><span class="stat-val"><span class="status-pill">${status}</span></span></div>
+
+                    <div class="section-title">Angebots- & Lückenanalyse</div>
+                    <div class="service-grid">
+                        ${serviceHTML}
+                    </div>
+
+                    <div class="section-title" style="margin-top:10px;">Geforderte Kapazitäten</div>
+                    <div class="stat-row"><span class="stat-label">VKL Heavy Bedarf:</span><span class="stat-val">${row['VKL Heavy'] || 'Nein'}</span></div>
+                    <div class="stat-row"><span class="stat-label">Kapazität Light:</span><span class="stat-val">${row['Kapazität im light Bereich (inkl. SMR)'] || 'N/A'}</span></div>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent);
+
+            allMarkers.push({
+                marker: marker,
+                status: bedarfStatus,
+                text: `${ort} ${plz} ${netzkennung} ${strasse}`.toLowerCase()
+            });
+
+            marker.addTo(map);
         }
 
         function filterMap() {
@@ -309,7 +305,7 @@
                 }
             });
 
-            document.getElementById('counter').innerText = `${visibleCount} angezeigt`;
+            document.getElementById('counter').innerText = `${visibleCount} von ${allMarkers.length} angezeigt`;
         }
 
         document.addEventListener("DOMContentLoaded", initMap);

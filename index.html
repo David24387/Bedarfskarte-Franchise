@@ -10,7 +10,11 @@
 
     <style>
         * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; height: 100%; width: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; background-color: #f8f9fa; }
+        html, body { 
+            margin: 0; padding: 0; height: 100%; width: 100%; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; background-color: #f8f9fa; 
+        }
         #map { height: 100vh; width: 100vw; z-index: 1; }
         
         .filter-container {
@@ -21,11 +25,16 @@
             width: 330px; border: 1px solid rgba(0,0,0,0.08);
             max-height: 85vh; overflow-y: auto;
         }
-        .filter-container h3 { margin: 0 0 12px 0; font-size: 16px; color: #1e293b; font-weight: 700; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .filter-container h3 { 
+            margin: 0 0 12px 0; font-size: 16px; color: #1e293b; font-weight: 700; 
+            border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; 
+            display: flex; justify-content: space-between; align-items: center; 
+        }
         .search-box { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 12px; font-size: 13px; outline: none; }
         .filter-group { margin-bottom: 10px; display: flex; align-items: center; }
         .filter-group label { font-size: 13px; cursor: pointer; color: #334155; display: flex; align-items: center; user-select: none; font-weight: 500; }
         .filter-group input { margin-right: 10px; cursor: pointer; width: 16px; height: 16px; }
+        
         .dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
         .dot-generell { background-color: #ef4444; }
         .dot-nur-heavy { background-color: #f97316; }
@@ -42,7 +51,9 @@
         .leaflet-popup-content { margin: 0 !important; width: 350px !important; line-height: 1.4; }
         .popup-header { padding: 14px 16px; color: white; background: #1e293b; }
         .popup-header h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; }
+        .popup-header p { margin: 0; font-size: 12px; opacity: 0.85; }
         .popup-body { padding: 14px 16px; max-height: 380px; overflow-y: auto; }
+        
         .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px; color: white; }
         
         .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 6px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
@@ -63,7 +74,7 @@
     <div class="filter-container">
         <h3>
             <span>Bedarf & Filter</span>
-            <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lädt...</span>
+            <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lade XLSX...</span>
         </h3>
         
         <input type="text" id="searchInput" class="search-box" placeholder="Suche Ort, PLZ oder Kennung..." onkeyup="filterMap()">
@@ -82,16 +93,16 @@
         </div>
     </div>
 
-    <div class="status-box" id="statusBox">Verbinde mit Google Sheets...</div>
+    <div class="status-box" id="statusBox">Lade Excel-Datei (.xlsx)...</div>
     <div id="map"></div>
 
+    <!-- Leaflet JS & SheetJS (Excel Parser) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <script>
-        // Euer pubhtml Link - wird automatisch in den Datenstream umgestellt
-        const PUBHTML_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFDiufFtP3EnpKNdGI6f8Kk1HaZoEzUCC79DnLdtqOSkzzs0eejgEypkw23MzIbyM4be4G63yGhhuN/pubhtml';
-        const STREAM_URL = PUBHTML_URL.replace('/pubhtml', '/pub?output=csv');
+        // Euer XLSX-Downloadlink aus Google Sheets
+        const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFDiufFtP3EnpKNdGI6f8Kk1HaZoEzUCC79DnLdtqOSkzzs0eejgEypkw23MzIbyM4be4G63yGhhuN/pub?output=xlsx';
 
         let map;
         let allMarkers = [];
@@ -108,43 +119,51 @@
                 maxZoom: 19
             }).addTo(map);
 
-            loadSheetData();
+            loadXlsxData();
         }
 
-        function loadSheetData() {
-            Papa.parse(STREAM_URL, {
-                download: true,
-                header: false, // Wichtig: Erst als Roh-Array laden wegen eures zweizeiligen Tabellenkopfs
-                skipEmptyLines: true,
-                complete: function(results) {
-                    processRawMatrix(results.data);
-                },
-                error: function(err) {
-                    setStatus("❌ Fehler beim Laden der Google-Sheet-Daten.");
+        function loadXlsxData() {
+            fetch(XLSX_URL)
+                .then(res => {
+                    if (!res.ok) throw new Error("Excel Datei konnte nicht geladen werden.");
+                    return res.arrayBuffer();
+                })
+                .then(buffer => {
+                    const workbook = XLSX.read(buffer, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Wandelt das Excel-Blatt in ein 2D-Array um
+                    const rawMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    processRawMatrix(rawMatrix);
+                })
+                .catch(err => {
+                    setStatus("❌ Fehler beim Laden der Excel-Datei: " + err.message);
                     console.error(err);
-                }
-            });
+                });
         }
 
         function processRawMatrix(matrix) {
             if (!matrix || matrix.length < 2) {
-                setStatus("⚠️ Tabelle ist leer.");
+                setStatus("⚠️ Excel-Datei ist leer.");
                 return;
             }
 
-            // Suche die ECHTE Header-Zeile (Zeile mit PLZ, Ort, Lat.Long.)
+            // Suche die ECHTE Spalten-Headerzeile (wo 'Ort', 'PLZ', 'Lat.Long.' steht)
             let headerIdx = -1;
-            for (let i = 0; i < Math.min(5, matrix.length); i++) {
-                let lineStr = matrix[i].join(' ').toLowerCase();
-                if (lineStr.includes('ort') || lineStr.includes('plz') || lineStr.includes('lat')) {
-                    headerIdx = i;
-                    break;
+            for (let i = 0; i < Math.min(10, matrix.length); i++) {
+                if (matrix[i]) {
+                    let lineStr = matrix[i].join(' ').toLowerCase();
+                    if (lineStr.includes('ort') || lineStr.includes('plz') || lineStr.includes('gesellschaft') || lineStr.includes('kst')) {
+                        headerIdx = i;
+                        break;
+                    }
                 }
             }
 
             if (headerIdx === -1) headerIdx = 0;
 
-            const headers = matrix[headerIdx].map(h => h ? h.trim() : '');
+            const headers = matrix[headerIdx].map(h => h ? h.toString().trim() : '');
             const dataRows = matrix.slice(headerIdx + 1);
 
             let count = 0;
@@ -152,15 +171,19 @@
             dataRows.forEach(rowArr => {
                 let row = {};
                 headers.forEach((h, idx) => {
-                    if (h) row[h] = rowArr[idx] ? rowArr[idx].trim() : '';
+                    if (h) row[h] = rowArr[idx] !== undefined && rowArr[idx] !== null ? rowArr[idx].toString().trim() : '';
                 });
 
-                // Spalte "Lat.Long." herauslesen
+                // Spalte "Lat.Long." auslesen
                 let coordsRaw = row['Lat.Long.'] || row['Lat. Long.'] || row['Lat,Long'] || '';
                 let lat = NaN, lng = NaN;
 
                 if (coordsRaw && coordsRaw.includes(',')) {
                     let parts = coordsRaw.split(',');
+                    lat = parseFloat(parts[0].replace(',', '.').trim());
+                    lng = parseFloat(parts[1].replace(',', '.').trim());
+                } else if (coordsRaw && coordsRaw.includes(' ')) {
+                    let parts = coordsRaw.split(' ');
                     lat = parseFloat(parts[0].replace(',', '.').trim());
                     lng = parseFloat(parts[1].replace(',', '.').trim());
                 }
@@ -172,11 +195,11 @@
             });
 
             if (count > 0) {
-                setStatus(`✅ <b>${count} Standorte erfolgreich geladen!</b>`);
+                setStatus(`✅ <b>${count} Standorte direkt aus Excel (.xlsx) geladen!</b>`);
                 document.getElementById('counter').innerText = `${count} Standorte`;
                 filterMap();
             } else {
-                setStatus("⚠️ Keine Standorte mit Auswertbaren Koordinaten gefunden.");
+                setStatus("⚠️ Keine Standorte mit gültigen Geokoordinaten in der Spalte 'Lat.Long.' gefunden.");
             }
         }
 
@@ -232,10 +255,11 @@
             const ort = row['Ort'] || 'Standort';
             const plz = row['PLZ'] || '';
             const strasse = row['Straße'] || row['Strasse'] || '';
+            const gesellschaft = row['Gesellschaft'] || '';
             const netzkennung = row['Netzkennung'] || row['KST'] || 'N/A';
-            const status = row['BUStatus'] || row['Gesellschaft'] || 'Franchise';
+            const status = row['BUStatus'] || 'Franchise';
 
-            // Angebots- & Lückenanalyse (Was da ist = Grüne Häkchen, Was fehlt = Rote Kreuze)
+            // Abgleich der Dienstleistungen (Grün = Da, Rot = Fehlt)
             const services = [
                 { name: 'Autoservice PKW', active: checkVal(row['Autoservice']) },
                 { name: 'Reifenservice PKW', active: checkVal(row['Reifenservice']) },
@@ -257,13 +281,14 @@
             const popupContent = `
                 <div class="popup-header">
                     <h4>${ort} ${plz ? '(' + plz + ')' : ''}</h4>
-                    <p>${strasse || 'Euromaster Standort'}</p>
+                    <p>${gesellschaft || strasse || 'Euromaster Partner'}</p>
                 </div>
                 <div class="popup-body">
                     <span class="badge" style="background-color: ${color};">${bedarfStatus}</span>
                     
                     <div class="stat-row"><span class="stat-label">Netzkennung / ID:</span><span class="stat-val">${netzkennung}</span></div>
                     <div class="stat-row"><span class="stat-label">Netzwerk-Typ:</span><span class="stat-val"><span class="status-pill">${status}</span></span></div>
+                    <div class="stat-row"><span class="stat-label">Straße:</span><span class="stat-val">${strasse}</span></div>
 
                     <div class="section-title">Angebots- & Lückenanalyse</div>
                     <div class="service-grid">
@@ -281,7 +306,7 @@
             allMarkers.push({
                 marker: marker,
                 status: bedarfStatus,
-                text: `${ort} ${plz} ${netzkennung} ${strasse}`.toLowerCase()
+                text: `${ort} ${plz} ${netzkennung} ${strasse} ${gesellschaft}`.toLowerCase()
             });
 
             marker.addTo(map);

@@ -117,6 +117,7 @@
         let allMarkers = [];
         let rawCenterData = [];
         let radiusCircle = null;
+        let activeRadiusCoords = null; // Speichert aktuelle 50km-Mittelpunktkoordinaten
         let searchTimeout = null;
 
         function setStatus(msg) {
@@ -275,7 +276,7 @@
                 weight: 2,
                 opacity: 1,
                 fillOpacity: 0.88,
-                pane: 'markerPane' // Stellt sicher, dass Marker immer über dem Radiuskreis liegen!
+                pane: 'markerPane'
             });
 
             let serviceHTML = '';
@@ -320,6 +321,8 @@
                 lng: c.lng,
                 plz: c.plz,
                 ort: c.ort,
+                hasFullLkw: c.hasFullLkw,
+                hasFullPkw: c.hasFullPkw,
                 text: `${c.ort} ${c.plz} ${c.netzkennung} ${c.kst} ${c.strasse} ${c.gesellschaft} ${c.region}`.toLowerCase()
             });
 
@@ -339,6 +342,8 @@
         }
 
         function analyzeRadius(clickLat, clickLng, customTitle) {
+            activeRadiusCoords = { lat: clickLat, lng: clickLng };
+
             if (radiusCircle) {
                 map.removeLayer(radiusCircle);
             }
@@ -350,14 +355,15 @@
                 radius: 50000 
             }).addTo(map);
 
-            let nearbyCenters = [];
+            // Auswertung aller Center im Radius
+            let nearbyCentersAll = [];
             let hasLkwFullService = false;
             let hasPkwFullService = false;
 
             rawCenterData.forEach(c => {
                 let dist = getDistanceKm(clickLat, clickLng, c.lat, c.lng);
                 if (dist <= 50) {
-                    nearbyCenters.push({ ...c, distance: dist });
+                    nearbyCentersAll.push({ ...c, distance: dist });
                     if (c.hasFullLkw) hasLkwFullService = true;
                     if (c.hasFullPkw) hasPkwFullService = true;
                 }
@@ -366,7 +372,7 @@
             let bedarfHeadline = "";
             let badgeColor = "#ef4444";
 
-            if (nearbyCenters.length === 0) {
+            if (nearbyCentersAll.length === 0) {
                 bedarfHeadline = "🚨 <b>GENERELLER BEDARF (Weißer Fleck)!</b><br>Kein Franchise-Partner im 50-km Radius. Hier wird ein neuer Partner gesucht!";
                 badgeColor = "#ef4444"; 
             } else if (!hasLkwFullService) {
@@ -381,7 +387,7 @@
             }
 
             let centerListHtml = "";
-            nearbyCenters.sort((a,b) => a.distance - b.distance).forEach(nc => {
+            nearbyCentersAll.sort((a,b) => a.distance - b.distance).forEach(nc => {
                 centerListHtml += `
                     <div style="font-size:11px; margin-bottom:4px; padding-bottom:4px; border-bottom:1px dashed #ddd;">
                         <b>${nc.ort}</b> (${nc.distance.toFixed(1)} km) - <i>${nc.bedarf}</i>
@@ -396,15 +402,15 @@
                 </div>
                 <div class="popup-body">
                     <span class="badge" style="background-color: ${badgeColor}; width:100%; text-align:center;">
-                        ${nearbyCenters.length} Center im 50 km Radius
+                        ${nearbyCentersAll.length} Partner im 50 km Radius
                     </span>
                     
                     <div class="radius-info-box">
                         ${bedarfHeadline}
                     </div>
 
-                    ${nearbyCenters.length > 0 ? `
-                        <div class="section-title" style="margin-top:10px;">Partner im 50 km Radius:</div>
+                    ${nearbyCentersAll.length > 0 ? `
+                        <div class="section-title" style="margin-top:10px;">Alle Partner im 50 km Radius:</div>
                         <div style="max-height:120px; overflow-y:auto;">
                             ${centerListHtml}
                         </div>
@@ -417,16 +423,15 @@
                 .setContent(popupContent)
                 .openOn(map);
 
-            // Stellt sicher, dass alle Marker sichtbar bleiben!
             filterMap();
         }
 
         function handleSearchInput() {
             clearTimeout(searchTimeout);
-            
             let searchText = document.getElementById('searchInput').value.trim();
 
             if (searchText === '') {
+                activeRadiusCoords = null;
                 if (radiusCircle) map.removeLayer(radiusCircle);
                 map.setView([51.1657, 10.4515], 6);
                 filterMap();
@@ -469,6 +474,7 @@
             const activeFilters = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
 
             let visibleCount = 0;
+            let radiusFilteredCount = 0;
 
             allMarkers.forEach(item => {
                 const matchesFilter = activeFilters.includes(item.status);
@@ -476,12 +482,24 @@
                 if (matchesFilter) {
                     map.addLayer(item.marker);
                     visibleCount++;
+
+                    // Wenn ein 50km-Radius aktiv ist, prüfe exakt wie viele GEFILTERTE Partner darin liegen!
+                    if (activeRadiusCoords) {
+                        let dist = getDistanceKm(activeRadiusCoords.lat, activeRadiusCoords.lng, item.lat, item.lng);
+                        if (dist <= 50) {
+                            radiusFilteredCount++;
+                        }
+                    }
                 } else {
                     map.removeLayer(item.marker);
                 }
             });
 
-            document.getElementById('counter').innerText = `${visibleCount} von ${allMarkers.length} angezeigt`;
+            if (activeRadiusCoords) {
+                document.getElementById('counter').innerText = `${radiusFilteredCount} Partner im 50 km Radius (${visibleCount} gesamt)`;
+            } else {
+                document.getElementById('counter').innerText = `${visibleCount} von ${allMarkers.length} angezeigt`;
+            }
         }
 
         document.addEventListener("DOMContentLoaded", initMap);

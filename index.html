@@ -15,7 +15,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             overflow: hidden; background-color: #f8f9fa; 
         }
-        #map { height: 100vh; width: 100vw; z-index: 1; }
+        #map { height: 100vh; width: 100vw; z-index: 1; cursor: crosshair; }
         
         .filter-container {
             position: absolute; top: 20px; right: 20px; z-index: 1000;
@@ -55,8 +55,8 @@
             font-size: 12px; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; box-shadow: 0 12px 28px rgba(0,0,0,0.22); width: 350px !important; }
-        .leaflet-popup-content { margin: 0 !important; width: 350px !important; line-height: 1.4; }
+        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; box-shadow: 0 12px 28px rgba(0,0,0,0.22); width: 360px !important; }
+        .leaflet-popup-content { margin: 0 !important; width: 360px !important; line-height: 1.4; }
         .popup-header { padding: 14px 16px; color: white; background: #1e293b; }
         .popup-header h4 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; }
         .popup-header p { margin: 0; font-size: 12px; opacity: 0.85; }
@@ -75,29 +75,34 @@
         .stat-label { color: #64748b; }
         .stat-val { font-weight: 600; color: #0f172a; }
         .status-pill { background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+
+        .radius-info-box {
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 12px;
+        }
     </style>
 </head>
 <body>
 
     <div class="filter-container">
         <h3>
-            <span>Bedarf & Filter</span>
+            <span>Bedarfs-Filter</span>
             <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lädt...</span>
         </h3>
         
         <input type="text" id="searchInput" class="search-box" placeholder="PLZ, Ort oder Netzkennung eingeben..." onkeyup="filterMap()">
 
         <div class="filter-group">
-            <label><input type="checkbox" value="Genereller Bedarf" checked onchange="filterMap()"> <span class="dot dot-generell"></span> Genereller Bedarf (Mixed)</label>
+            <label><input type="checkbox" value="LKW/Heavy Bedarf" checked onchange="filterMap()"> <span class="dot dot-nur-heavy"></span> LKW / Heavy-Erweiterungsbedarf</label>
         </div>
         <div class="filter-group">
-            <label><input type="checkbox" value="Nur Heavy" checked onchange="filterMap()"> <span class="dot dot-nur-heavy"></span> Nur Heavy Bedarf (LKW)</label>
+            <label><input type="checkbox" value="PKW/Light Bedarf" checked onchange="filterMap()"> <span class="dot dot-kein-heavy"></span> PKW / Light-Erweiterungsbedarf</label>
         </div>
         <div class="filter-group">
-            <label><input type="checkbox" value="Kein Heavy" checked onchange="filterMap()"> <span class="dot dot-kein-heavy"></span> Kein Heavy (Nur Light/PKW)</label>
+            <label><input type="checkbox" value="Vollausgestattet" checked onchange="filterMap()"> <span class="dot dot-kein-bedarf"></span> Vollausgestattet (Mixed)</label>
         </div>
-        <div class="filter-group">
-            <label><input type="checkbox" value="Kein Bedarf" checked onchange="filterMap()"> <span class="dot dot-kein-bedarf"></span> Vollausgestattet (Kein Bedarf)</label>
+        
+        <div style="font-size: 11px; color: #64748b; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
+            📍 <b>Tipp:</b> Klicke auf eine Region für einen <b>20 km Bedarfs-Check</b>!
         </div>
     </div>
 
@@ -110,6 +115,8 @@
     <script>
         let map;
         let allMarkers = [];
+        let rawCenterData = [];
+        let radiusCircle = null;
 
         function setStatus(msg) {
             document.getElementById('statusBox').innerHTML = msg;
@@ -122,6 +129,10 @@
                 attribution: '&copy; OpenStreetMap & CartoDB',
                 maxZoom: 19
             }).addTo(map);
+
+            map.on('click', function(e) {
+                analyzeRadius(e.latlng.lat, e.latlng.lng);
+            });
 
             loadCsvData();
         }
@@ -161,7 +172,7 @@
             const headers = matrix[headerIdx].map(h => h ? h.toString().trim() : '');
             const dataRows = matrix.slice(headerIdx + 1);
 
-            let parsedCenters = [];
+            rawCenterData = [];
 
             dataRows.forEach(rowArr => {
                 let row = {};
@@ -177,13 +188,16 @@
 
                 if (!isNaN(lat) && !isNaN(lng)) {
                     let bu = row['BU'] || '';
-                    let bedarf = 'Genereller Bedarf';
-                    if (bu === 'Heavy') bedarf = 'Nur Heavy';
-                    else if (bu === 'Light') bedarf = 'Kein Heavy';
+                    
+                    // Korrigierte Erweiterungsbedarf-Logik
+                    let bedarf = 'Vollausgestattet';
+                    if (bu === 'Light') bedarf = 'LKW/Heavy Bedarf';
+                    else if (bu === 'Heavy') bedarf = 'PKW/Light Bedarf';
+                    else if (bu === 'Mixed') bedarf = 'Vollausgestattet';
 
                     let isYes = (v) => v && ['ja','1','x','true'].includes(v.toLowerCase());
 
-                    parsedCenters.push({
+                    rawCenterData.push({
                         kst: row['KST'] || '',
                         netzkennung: row['Netzkennung'] || '',
                         gesellschaft: row['Gesellschaft'] || '',
@@ -212,9 +226,9 @@
                 }
             });
 
-            if (parsedCenters.length > 0) {
-                loadCenterData(parsedCenters);
-                setStatus(`✅ <b>${parsedCenters.length} Franchisepartner geladen!</b>`);
+            if (parsedCount = rawCenterData.length) {
+                loadCenterData(rawCenterData);
+                setStatus(`✅ <b>${parsedCount} Franchisepartner geladen!</b>`);
             } else {
                 setStatus("⚠️ Keine Standorte mit gültigen Koordinaten gefunden.");
             }
@@ -237,10 +251,9 @@
         }
 
         function addCenterMarker(c) {
-            let color = '#ef4444'; // Rot
-            if (c.bedarf === 'Nur Heavy') color = '#f97316';       // Orange
-            else if (c.bedarf === 'Kein Heavy') color = '#3b82f6'; // Blau
-            else if (c.bedarf === 'Kein Bedarf') color = '#10b981';// Grün
+            let color = '#10b981'; // Grün (Vollausgestattet)
+            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; // Orange (Braucht LKW)
+            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; // Blau (Braucht PKW)
 
             const marker = L.circleMarker([c.lat, c.lng], {
                 radius: 8,
@@ -268,18 +281,17 @@
                 <div class="popup-body">
                     <span class="badge" style="background-color: ${color};">${c.bedarf}</span>
                     
+                    <div class="stat-row"><span class="stat-label">Standort-Typ:</span><span class="stat-val"><span class="status-pill">${c.bu || 'Franchise'}</span></span></div>
                     <div class="stat-row"><span class="stat-label">Netzkennung / KST:</span><span class="stat-val">${c.netzkennung || c.kst || 'N/A'}</span></div>
-                    <div class="stat-row"><span class="stat-label">Netzwerk-Typ:</span><span class="stat-val"><span class="status-pill">${c.bu || 'Franchise'}</span></span></div>
                     <div class="stat-row"><span class="stat-label">Straße:</span><span class="stat-val">${c.strasse || 'N/A'}</span></div>
                     <div class="stat-row"><span class="stat-label">Region:</span><span class="stat-val">${c.region || 'N/A'}</span></div>
-                    ${c.tel ? `<div class="stat-row"><span class="stat-label">Telefon:</span><span class="stat-val">${c.tel}</span></div>` : ''}
 
-                    <div class="section-title">Angebots- & Lückenanalyse</div>
+                    <div class="section-title">Vorhandene Leistungen vs. Lücken</div>
                     <div class="service-grid">
                         ${serviceHTML}
                     </div>
 
-                    <div class="section-title" style="margin-top:10px;">Ausstattung / Bühnen</div>
+                    <div class="section-title" style="margin-top:10px;">Ausstattung</div>
                     <div class="stat-row"><span class="stat-label">Anzahl Hebebühnen:</span><span class="stat-val">${c.buehnen || '0'}</span></div>
                     <div class="stat-row"><span class="stat-label">Bühnen >3.5t (LLKW):</span><span class="stat-val">${c.buehnen_35t || '0'}</span></div>
                 </div>
@@ -296,6 +308,98 @@
             });
 
             marker.addTo(map);
+        }
+
+        function getDistanceKm(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function analyzeRadius(clickLat, clickLng) {
+            if (radiusCircle) {
+                map.removeLayer(radiusCircle);
+            }
+
+            radiusCircle = L.circle([clickLat, clickLng], {
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.12,
+                radius: 20000 
+            }).addTo(map);
+
+            let nearbyCenters = [];
+            let hasLkwService = false;
+            let hasPkwService = false;
+
+            rawCenterData.forEach(c => {
+                let dist = getDistanceKm(clickLat, clickLng, c.lat, c.lng);
+                if (dist <= 20) {
+                    nearbyCenters.push({ ...c, distance: dist });
+                    if (c.bu === 'Heavy' || c.bu === 'Mixed' || c.services['LKW Reifenservice']) hasLkwService = true;
+                    if (c.bu === 'Light' || c.bu === 'Mixed' || c.services['Reifenservice PKW']) hasPkwService = true;
+                }
+            });
+
+            let bedarfHeadline = "";
+            let badgeColor = "#ef4444";
+
+            if (nearbyCenters.length === 0) {
+                bedarfHeadline = "🚨 <b>GENERELLER BEDARF (Weißer Fleck)!</b><br>Kein Franchise-Partner im 20-km Radius. Hier wird ein neuer Partner gesucht!";
+                badgeColor = "#ef4444"; // Rot
+            } else if (!hasLkwService) {
+                bedarfHeadline = "🟧 <b>LKW / HEAVY ERWEITERUNGSBEDARF:</b><br>PKW-Partner vorhanden, aber kein LKW-Service im 20-km Umkreis!";
+                badgeColor = "#f97316"; // Orange
+            } else if (!hasPkwService) {
+                bedarfHeadline = "🟦 <b>PKW / LIGHT ERWEITERUNGSBEDARF:</b><br>LKW-Partner vorhanden, aber kein PKW-Service im 20-km Umkreis!";
+                badgeColor = "#3b82f6"; // Blau
+            } else {
+                bedarfHeadline = "🟢 <b>GUTE ABDECKUNG:</b><br>Sowohl PKW- als auch LKW-Leistungen im 20-km Umkreis vorhanden.";
+                badgeColor = "#10b981"; // Grün
+            }
+
+            let centerListHtml = "";
+            nearbyCenters.sort((a,b) => a.distance - b.distance).forEach(nc => {
+                centerListHtml += `
+                    <div style="font-size:11px; margin-bottom:4px; padding-bottom:4px; border-bottom:1px dashed #ddd;">
+                        <b>${nc.ort}</b> (${nc.distance.toFixed(1)} km) - <i>${nc.bu}</i>
+                    </div>
+                `;
+            });
+
+            const popupContent = `
+                <div class="popup-header">
+                    <h4>Regionaler 20 km Bedarfs-Check</h4>
+                    <p>Auswertung für die gewählte Region</p>
+                </div>
+                <div class="popup-body">
+                    <span class="badge" style="background-color: ${badgeColor}; width:100%; text-align:center;">
+                        ${nearbyCenters.length} Center im 20 km Radius
+                    </span>
+                    
+                    <div class="radius-info-box">
+                        ${bedarfHeadline}
+                    </div>
+
+                    ${nearbyCenters.length > 0 ? `
+                        <div class="section-title" style="margin-top:10px;">Partner im 20 km Radius:</div>
+                        <div style="max-height:120px; overflow-y:auto;">
+                            ${centerListHtml}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            L.popup()
+                .setLatLng([clickLat, clickLng])
+                .setContent(popupContent)
+                .openOn(map);
         }
 
         function filterMap() {

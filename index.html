@@ -74,7 +74,7 @@
     <div class="filter-container">
         <h3>
             <span>Bedarf & Filter</span>
-            <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lade XLSX...</span>
+            <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lade Daten...</span>
         </h3>
         
         <input type="text" id="searchInput" class="search-box" placeholder="Suche Ort, PLZ oder Kennung..." onkeyup="filterMap()">
@@ -93,17 +93,13 @@
         </div>
     </div>
 
-    <div class="status-box" id="statusBox">Lade Excel-Datei (.xlsx)...</div>
+    <div class="status-box" id="statusBox">Lade daten.csv...</div>
     <div id="map"></div>
 
-    <!-- Leaflet JS & SheetJS (Excel Parser) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     
     <script>
-        // Euer XLSX-Downloadlink aus Google Sheets
-        const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQFDiufFtP3EnpKNdGI6f8Kk1HaZoEzUCC79DnLdtqOSkzzs0eejgEypkw23MzIbyM4be4G63yGhhuN/pub?output=xlsx';
-
         let map;
         let allMarkers = [];
 
@@ -119,37 +115,29 @@
                 maxZoom: 19
             }).addTo(map);
 
-            loadXlsxData();
+            loadLocalCsv();
         }
 
-        function loadXlsxData() {
-            fetch(XLSX_URL)
-                .then(res => {
-                    if (!res.ok) throw new Error("Excel Datei konnte nicht geladen werden.");
-                    return res.arrayBuffer();
-                })
-                .then(buffer => {
-                    const workbook = XLSX.read(buffer, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    // Wandelt das Excel-Blatt in ein 2D-Array um
-                    const rawMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    processRawMatrix(rawMatrix);
-                })
-                .catch(err => {
-                    setStatus("❌ Fehler beim Laden der Excel-Datei: " + err.message);
-                    console.error(err);
-                });
+        function loadLocalCsv() {
+            Papa.parse('daten.csv', {
+                download: true,
+                header: false,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    processRawMatrix(results.data);
+                },
+                error: function(err) {
+                    setStatus("❌ Fehler: daten.csv wurde im Repository nicht gefunden!");
+                }
+            });
         }
 
         function processRawMatrix(matrix) {
             if (!matrix || matrix.length < 2) {
-                setStatus("⚠️ Excel-Datei ist leer.");
+                setStatus("⚠️ daten.csv ist leer.");
                 return;
             }
 
-            // Suche die ECHTE Spalten-Headerzeile (wo 'Ort', 'PLZ', 'Lat.Long.' steht)
             let headerIdx = -1;
             for (let i = 0; i < Math.min(10, matrix.length); i++) {
                 if (matrix[i]) {
@@ -174,19 +162,21 @@
                     if (h) row[h] = rowArr[idx] !== undefined && rowArr[idx] !== null ? rowArr[idx].toString().trim() : '';
                 });
 
-                // Spalte "Lat.Long." auslesen
-                let coordsRaw = row['Lat.Long.'] || row['Lat. Long.'] || row['Lat,Long'] || '';
                 let lat = NaN, lng = NaN;
 
-                if (coordsRaw && coordsRaw.includes(',')) {
-                    let parts = coordsRaw.split(',');
-                    lat = parseFloat(parts[0].replace(',', '.').trim());
-                    lng = parseFloat(parts[1].replace(',', '.').trim());
-                } else if (coordsRaw && coordsRaw.includes(' ')) {
-                    let parts = coordsRaw.split(' ');
-                    lat = parseFloat(parts[0].replace(',', '.').trim());
-                    lng = parseFloat(parts[1].replace(',', '.').trim());
-                }
+                // Koordinaten aus der Spalte "Lat.Long." auslesen
+                rowArr.forEach(cell => {
+                    if (!cell) return;
+                    let str = cell.toString().trim();
+                    let match = str.match(/(\d{2}[.,]\d+)\s*[,;\s]\s*(\d{1,2}[.,]\d+)/);
+                    if (match) {
+                        let p1 = parseFloat(match[1].replace(',', '.'));
+                        let p2 = parseFloat(match[2].replace(',', '.'));
+                        if (p1 >= 47 && p1 <= 56 && p2 >= 5 && p2 <= 16) {
+                            lat = p1; lng = p2;
+                        }
+                    }
+                });
 
                 if (!isNaN(lat) && !isNaN(lng)) {
                     count++;
@@ -195,11 +185,11 @@
             });
 
             if (count > 0) {
-                setStatus(`✅ <b>${count} Standorte direkt aus Excel (.xlsx) geladen!</b>`);
+                setStatus(`✅ <b>${count} Franchisepartner geladen!</b>`);
                 document.getElementById('counter').innerText = `${count} Standorte`;
                 filterMap();
             } else {
-                setStatus("⚠️ Keine Standorte mit gültigen Geokoordinaten in der Spalte 'Lat.Long.' gefunden.");
+                setStatus("⚠️ Keine Koordinaten erkannt. Prüfe die Datei daten.csv.");
             }
         }
 
@@ -231,10 +221,10 @@
 
         function getColor(status) {
             switch (status) {
-                case 'Genereller Bedarf': return '#ef4444'; // Rot
-                case 'Nur Heavy':        return '#f97316'; // Orange
-                case 'Kein Heavy':       return '#3b82f6'; // Blau
-                case 'Kein Bedarf':      return '#10b981'; // Grün
+                case 'Genereller Bedarf': return '#ef4444';
+                case 'Nur Heavy':        return '#f97316';
+                case 'Kein Heavy':       return '#3b82f6';
+                case 'Kein Bedarf':      return '#10b981';
                 default:                 return '#94a3b8';
             }
         }
@@ -259,7 +249,6 @@
             const netzkennung = row['Netzkennung'] || row['KST'] || 'N/A';
             const status = row['BUStatus'] || 'Franchise';
 
-            // Abgleich der Dienstleistungen (Grün = Da, Rot = Fehlt)
             const services = [
                 { name: 'Autoservice PKW', active: checkVal(row['Autoservice']) },
                 { name: 'Reifenservice PKW', active: checkVal(row['Reifenservice']) },

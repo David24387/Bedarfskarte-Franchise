@@ -98,7 +98,7 @@
             <label><input type="checkbox" value="PKW/Light Bedarf" checked onchange="filterMap()"> <span class="dot dot-kein-heavy"></span> PKW / Light-Erweiterungsbedarf</label>
         </div>
         <div class="filter-group">
-            <label><input type="checkbox" value="Vollausgestattet" checked onchange="filterMap()"> <span class="dot dot-kein-bedarf"></span> Vollausgestattet (Mixed)</label>
+            <label><input type="checkbox" value="Vollausgestattet" checked onchange="filterMap()"> <span class="dot dot-kein-bedarf"></span> Vollausgestattet (PKW & LKW)</label>
         </div>
         
         <div style="font-size: 11px; color: #64748b; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
@@ -188,14 +188,22 @@
                 let lng = parseFloat(lngStr.replace(',', '.'));
 
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    let bu = row['BU'] || '';
-                    
-                    let bedarf = 'Vollausgestattet';
-                    if (bu === 'Light') bedarf = 'LKW/Heavy Bedarf';
-                    else if (bu === 'Heavy') bedarf = 'PKW/Light Bedarf';
-                    else if (bu === 'Mixed') bedarf = 'Vollausgestattet';
-
                     let isYes = (v) => v && ['ja','1','x','true'].includes(v.toLowerCase());
+
+                    // Echtes Service-Prüfungsverfahren (Unabhängig von der Spalte 'BU'):
+                    let hasPkw = isYes(row['Autoservice']) || isYes(row['Reifenservice']);
+                    let hasLkw = isYes(row['Hebebühne vorhanden\n(LKW)']) || isYes(row['Rad- Reifen Service\n(LKW)']) || isYes(row['Autoservice (LKW)']) || isYes(row['Breakdown Service']);
+
+                    let bedarf = 'Vollausgestattet';
+                    if (hasPkw && hasLkw) {
+                        bedarf = 'Vollausgestattet';
+                    } else if (hasPkw && !hasLkw) {
+                        bedarf = 'LKW/Heavy Bedarf';
+                    } else if (!hasPkw && hasLkw) {
+                        bedarf = 'PKW/Light Bedarf';
+                    } else {
+                        bedarf = 'LKW/Heavy Bedarf'; // Fallback
+                    }
 
                     rawCenterData.push({
                         kst: row['KST'] || '',
@@ -206,20 +214,22 @@
                         ort: row['Ort'] || '',
                         lat: lat,
                         lng: lng,
-                        bu: bu,
+                        bu: row['BU'] || '',
                         bedarf: bedarf,
                         region: row['Region'] || '',
                         buehnen: row['Anzahl Hebebühnen'] || '0',
                         buehnen_35t: row['Anzahl Hebebühnen > 3,5T'] || '0',
                         tel: `${row['Tel. (Vor)'] || ''} ${row['Tel. (Ruf)'] || ''}`.trim(),
+                        hasLkw: hasLkw,
+                        hasPkw: hasPkw,
                         services: {
                             'Autoservice PKW': isYes(row['Autoservice']),
                             'Reifenservice PKW': isYes(row['Reifenservice']),
                             'Autoglas': isYes(row['Autoglas']),
                             'Hochvolt / EV': isYes(row['EV / Hochvolt']),
-                            'LKW Reifenservice': isYes(row['Rad- Reifen Service (LKW)']),
+                            'LKW Reifenservice': isYes(row['Rad- Reifen Service\n(LKW)']),
                             'LKW Autoservice': isYes(row['Autoservice (LKW)']),
-                            'LKW Hebebühne': isYes(row['Hebebühne vorhanden (LKW)']),
+                            'LKW Hebebühne': isYes(row['Hebebühne vorhanden\n(LKW)']),
                             'Mobiler Service': isYes(row['Breakdown Service'])
                         }
                     });
@@ -251,9 +261,9 @@
         }
 
         function addCenterMarker(c) {
-            let color = '#10b981'; 
-            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; 
-            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; 
+            let color = '#10b981'; // Grün (Vollausgestattet)
+            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; // Orange (Braucht LKW)
+            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; // Blau (Braucht PKW)
 
             const marker = L.circleMarker([c.lat, c.lng], {
                 radius: 8,
@@ -281,7 +291,7 @@
                 <div class="popup-body">
                     <span class="badge" style="background-color: ${color};">${c.bedarf}</span>
                     
-                    <div class="stat-row"><span class="stat-label">Standort-Typ:</span><span class="stat-val"><span class="status-pill">${c.bu || 'Franchise'}</span></span></div>
+                    <div class="stat-row"><span class="stat-label">Netzwerk-Typ:</span><span class="stat-val"><span class="status-pill">${c.bu || 'Franchise'}</span></span></div>
                     <div class="stat-row"><span class="stat-label">Netzkennung / KST:</span><span class="stat-val">${c.netzkennung || c.kst || 'N/A'}</span></div>
                     <div class="stat-row"><span class="stat-label">Straße:</span><span class="stat-val">${c.strasse || 'N/A'}</span></div>
                     <div class="stat-row"><span class="stat-label">Region:</span><span class="stat-val">${c.region || 'N/A'}</span></div>
@@ -344,8 +354,8 @@
                 let dist = getDistanceKm(clickLat, clickLng, c.lat, c.lng);
                 if (dist <= 50) {
                     nearbyCenters.push({ ...c, distance: dist });
-                    if (c.bu === 'Heavy' || c.bu === 'Mixed' || c.services['LKW Reifenservice']) hasLkwService = true;
-                    if (c.bu === 'Light' || c.bu === 'Mixed' || c.services['Reifenservice PKW']) hasPkwService = true;
+                    if (c.hasLkw) hasLkwService = true;
+                    if (c.hasPkw) hasPkwService = true;
                 }
             });
 
@@ -356,7 +366,7 @@
                 bedarfHeadline = "🚨 <b>GENERELLER BEDARF (Weißer Fleck)!</b><br>Kein Franchise-Partner im 50-km Radius. Hier wird ein neuer Partner gesucht!";
                 badgeColor = "#ef4444"; 
             } else if (!hasLkwService) {
-                bedarfHeadline = "🟧 <b>LKW / HEAVY ERWEITERUNGSBEDARF:</b><br>PKW-Partner vorhanden, aber kein LKW-Service im 50-km Umkreis!";
+                bedarfHeadline = "🟧 <b>LKW / HEAVY ERWEITERUNGSBEDARF:</b><br>PKW-Partner vorhanden, aber kein echter LKW-Service im 50-km Umkreis!";
                 badgeColor = "#f97316"; 
             } else if (!hasPkwService) {
                 bedarfHeadline = "🟦 <b>PKW / LIGHT ERWEITERUNGSBEDARF:</b><br>LKW-Partner vorhanden, aber kein PKW-Service im 50-km Umkreis!";
@@ -370,7 +380,7 @@
             nearbyCenters.sort((a,b) => a.distance - b.distance).forEach(nc => {
                 centerListHtml += `
                     <div style="font-size:11px; margin-bottom:4px; padding-bottom:4px; border-bottom:1px dashed #ddd;">
-                        <b>${nc.ort}</b> (${nc.distance.toFixed(1)} km) - <i>${nc.bu}</i>
+                        <b>${nc.ort}</b> (${nc.distance.toFixed(1)} km) - <i>${nc.bedarf}</i>
                     </div>
                 `;
             });
@@ -411,7 +421,6 @@
             searchTimeout = setTimeout(function() {
                 let searchText = document.getElementById('searchInput').value.trim();
                 
-                // Prüfe, ob eine 5-stellige deutsche PLZ oder ein Suchbegriff eingegeben wurde
                 if (/^\d{5}$/.test(searchText) || searchText.length >= 3) {
                     geocodePlzAndAnalyze(searchText);
                 } else if (searchText === '') {
@@ -421,7 +430,6 @@
             }, 600);
         }
 
-        // Live Geocoding für eingegebene PLZ / Orte über OpenStreetMap Nominatim
         function geocodePlzAndAnalyze(query) {
             let searchUrl = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=de&q=${encodeURIComponent(query)}`;
 

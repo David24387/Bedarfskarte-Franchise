@@ -102,7 +102,7 @@
         </div>
         
         <div style="font-size: 11px; color: #64748b; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
-            📍 <b>Tipp:</b> Klicke auf eine Region für einen <b>50 km Bedarfs-Check</b>!
+            📍 <b>Tipp:</b> Gib eine PLZ ein oder klicke auf die Karte für den <b>50 km Radius-Check</b>!
         </div>
     </div>
 
@@ -250,9 +250,9 @@
         }
 
         function addCenterMarker(c) {
-            let color = '#10b981'; // Grün (Vollausgestattet)
-            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; // Orange
-            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; // Blau
+            let color = '#10b981'; 
+            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; 
+            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; 
 
             const marker = L.circleMarker([c.lat, c.lng], {
                 radius: 8,
@@ -303,6 +303,8 @@
                 status: c.bedarf,
                 lat: c.lat,
                 lng: c.lng,
+                plz: c.plz,
+                ort: c.ort,
                 text: `${c.ort} ${c.plz} ${c.netzkennung} ${c.kst} ${c.strasse} ${c.gesellschaft} ${c.region}`.toLowerCase()
             });
 
@@ -321,18 +323,16 @@
             return R * c;
         }
 
-        // 50-km Radius-Analyse beim Klick auf die Karte
-        function analyzeRadius(clickLat, clickLng) {
+        function analyzeRadius(clickLat, clickLng, customTitle) {
             if (radiusCircle) {
                 map.removeLayer(radiusCircle);
             }
 
-            // Transparenten 50km-Kreis auf die Karte zeichnen
             radiusCircle = L.circle([clickLat, clickLng], {
                 color: '#ef4444',
                 fillColor: '#ef4444',
                 fillOpacity: 0.12,
-                radius: 50000 // 50 km in Metern
+                radius: 50000 
             }).addTo(map);
 
             let nearbyCenters = [];
@@ -341,7 +341,7 @@
 
             rawCenterData.forEach(c => {
                 let dist = getDistanceKm(clickLat, clickLng, c.lat, c.lng);
-                if (dist <= 50) { // Auf 50 km abgefragt
+                if (dist <= 50) {
                     nearbyCenters.push({ ...c, distance: dist });
                     if (c.bu === 'Heavy' || c.bu === 'Mixed' || c.services['LKW Reifenservice']) hasLkwService = true;
                     if (c.bu === 'Light' || c.bu === 'Mixed' || c.services['Reifenservice PKW']) hasPkwService = true;
@@ -376,8 +376,8 @@
 
             const popupContent = `
                 <div class="popup-header">
-                    <h4>Regionaler 50 km Bedarfs-Check</h4>
-                    <p>Auswertung für die gewählte Region</p>
+                    <h4>${customTitle || 'Regionaler 50 km Bedarfs-Check'}</h4>
+                    <p>Auswertung im 50 km Umkreis</p>
                 </div>
                 <div class="popup-body">
                     <span class="badge" style="background-color: ${badgeColor}; width:100%; text-align:center;">
@@ -410,6 +410,7 @@
 
             let visibleCount = 0;
             let bounds = [];
+            let matchedItems = [];
 
             allMarkers.forEach(item => {
                 const matchesFilter = activeFilters.includes(item.status);
@@ -419,6 +420,7 @@
                     map.addLayer(item.marker);
                     visibleCount++;
                     bounds.push([item.lat, item.lng]);
+                    matchedItems.push(item);
                 } else {
                     map.removeLayer(item.marker);
                 }
@@ -426,9 +428,17 @@
 
             document.getElementById('counter').innerText = `${visibleCount} von ${allMarkers.length} angezeigt`;
 
+            // Auto-Zoom und automatischer 50 km Radius bei PLZ-/Ortssuche
             if (searchText.length >= 2 && bounds.length > 0) {
-                map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 13, duration: 1 });
+                map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 12, duration: 1 });
+
+                // Wenn exakt nach einer PLZ oder einem Ort gesucht wird, automatisch den 50 km Radius anwenden!
+                if (matchedItems.length > 0) {
+                    let firstMatch = matchedItems[0];
+                    analyzeRadius(firstMatch.lat, firstMatch.lng, `50 km Check für PLZ / Ort "${searchText.toUpperCase()}"`);
+                }
             } else if (searchText === '' && allMarkers.length > 0) {
+                if (radiusCircle) map.removeLayer(radiusCircle);
                 map.setView([51.1657, 10.4515], 6);
             }
         }

@@ -189,7 +189,6 @@
                 if (!isNaN(lat) && !isNaN(lng)) {
                     let bu = row['BU'] || '';
                     
-                    // Korrigierte Erweiterungsbedarf-Logik
                     let bedarf = 'Vollausgestattet';
                     if (bu === 'Light') bedarf = 'LKW/Heavy Bedarf';
                     else if (bu === 'Heavy') bedarf = 'PKW/Light Bedarf';
@@ -252,8 +251,8 @@
 
         function addCenterMarker(c) {
             let color = '#10b981'; // Grün (Vollausgestattet)
-            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; // Orange (Braucht LKW)
-            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; // Blau (Braucht PKW)
+            if (c.bedarf === 'LKW/Heavy Bedarf') color = '#f97316'; // Orange
+            else if (c.bedarf === 'PKW/Light Bedarf') color = '#3b82f6'; // Blau
 
             const marker = L.circleMarker([c.lat, c.lng], {
                 radius: 8,
@@ -322,16 +321,18 @@
             return R * c;
         }
 
+        // 50-km Radius-Analyse beim Klick auf die Karte
         function analyzeRadius(clickLat, clickLng) {
             if (radiusCircle) {
                 map.removeLayer(radiusCircle);
             }
 
+            // Transparenten 50km-Kreis auf die Karte zeichnen
             radiusCircle = L.circle([clickLat, clickLng], {
                 color: '#ef4444',
                 fillColor: '#ef4444',
                 fillOpacity: 0.12,
-                radius: 20000 
+                radius: 50000 // 50 km in Metern
             }).addTo(map);
 
             let nearbyCenters = [];
@@ -340,7 +341,7 @@
 
             rawCenterData.forEach(c => {
                 let dist = getDistanceKm(clickLat, clickLng, c.lat, c.lng);
-                if (dist <= 20) {
+                if (dist <= 50) { // Auf 50 km abgefragt
                     nearbyCenters.push({ ...c, distance: dist });
                     if (c.bu === 'Heavy' || c.bu === 'Mixed' || c.services['LKW Reifenservice']) hasLkwService = true;
                     if (c.bu === 'Light' || c.bu === 'Mixed' || c.services['Reifenservice PKW']) hasPkwService = true;
@@ -351,17 +352,17 @@
             let badgeColor = "#ef4444";
 
             if (nearbyCenters.length === 0) {
-                bedarfHeadline = "🚨 <b>GENERELLER BEDARF (Weißer Fleck)!</b><br>Kein Franchise-Partner im 20-km Radius. Hier wird ein neuer Partner gesucht!";
-                badgeColor = "#ef4444"; // Rot
+                bedarfHeadline = "🚨 <b>GENERELLER BEDARF (Weißer Fleck)!</b><br>Kein Franchise-Partner im 50-km Radius. Hier wird ein neuer Partner gesucht!";
+                badgeColor = "#ef4444"; 
             } else if (!hasLkwService) {
-                bedarfHeadline = "🟧 <b>LKW / HEAVY ERWEITERUNGSBEDARF:</b><br>PKW-Partner vorhanden, aber kein LKW-Service im 20-km Umkreis!";
-                badgeColor = "#f97316"; // Orange
+                bedarfHeadline = "🟧 <b>LKW / HEAVY ERWEITERUNGSBEDARF:</b><br>PKW-Partner vorhanden, aber kein LKW-Service im 50-km Umkreis!";
+                badgeColor = "#f97316"; 
             } else if (!hasPkwService) {
-                bedarfHeadline = "🟦 <b>PKW / LIGHT ERWEITERUNGSBEDARF:</b><br>LKW-Partner vorhanden, aber kein PKW-Service im 20-km Umkreis!";
-                badgeColor = "#3b82f6"; // Blau
+                bedarfHeadline = "🟦 <b>PKW / LIGHT ERWEITERUNGSBEDARF:</b><br>LKW-Partner vorhanden, aber kein PKW-Service im 50-km Umkreis!";
+                badgeColor = "#3b82f6"; 
             } else {
-                bedarfHeadline = "🟢 <b>GUTE ABDECKUNG:</b><br>Sowohl PKW- als auch LKW-Leistungen im 20-km Umkreis vorhanden.";
-                badgeColor = "#10b981"; // Grün
+                bedarfHeadline = "🟢 <b>GUTE ABDECKUNG:</b><br>Sowohl PKW- als auch LKW-Leistungen im 50-km Umkreis vorhanden.";
+                badgeColor = "#10b981"; 
             }
 
             let centerListHtml = "";

@@ -89,7 +89,7 @@
             <span id="counter" style="font-size: 12px; font-weight: normal; color: #64748b;">Lädt...</span>
         </h3>
         
-        <input type="text" id="searchInput" class="search-box" placeholder="PLZ, Ort oder Netzkennung eingeben..." onkeyup="filterMap()">
+        <input type="text" id="searchInput" class="search-box" placeholder="PLZ, Ort oder Netzkennung eingeben..." onkeyup="handleSearchInput()">
 
         <div class="filter-group">
             <label><input type="checkbox" value="LKW/Heavy Bedarf" checked onchange="filterMap()"> <span class="dot dot-nur-heavy"></span> LKW / Heavy-Erweiterungsbedarf</label>
@@ -102,7 +102,7 @@
         </div>
         
         <div style="font-size: 11px; color: #64748b; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px;">
-            📍 <b>Tipp:</b> Gib eine PLZ ein oder klicke auf die Karte für den <b>50 km Radius-Check</b>!
+            📍 <b>Tipp:</b> Gib eine PLZ ein (z. B. 60318) für den automatischen <b>50 km Radius-Check</b>!
         </div>
     </div>
 
@@ -117,6 +117,7 @@
         let allMarkers = [];
         let rawCenterData = [];
         let radiusCircle = null;
+        let searchTimeout = null;
 
         function setStatus(msg) {
             document.getElementById('statusBox').innerHTML = msg;
@@ -403,14 +404,49 @@
                 .openOn(map);
         }
 
+        function handleSearchInput() {
+            filterMap();
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                let searchText = document.getElementById('searchInput').value.trim();
+                
+                // Prüfe, ob eine 5-stellige deutsche PLZ oder ein Suchbegriff eingegeben wurde
+                if (/^\d{5}$/.test(searchText) || searchText.length >= 3) {
+                    geocodePlzAndAnalyze(searchText);
+                } else if (searchText === '') {
+                    if (radiusCircle) map.removeLayer(radiusCircle);
+                    map.setView([51.1657, 10.4515], 6);
+                }
+            }, 600);
+        }
+
+        // Live Geocoding für eingegebene PLZ / Orte über OpenStreetMap Nominatim
+        function geocodePlzAndAnalyze(query) {
+            let searchUrl = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=de&q=${encodeURIComponent(query)}`;
+
+            fetch(searchUrl)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        let lat = parseFloat(data[0].lat);
+                        let lng = parseFloat(data[0].lon);
+
+                        map.flyTo([lat, lng], 10, { duration: 1.2 });
+                        analyzeRadius(lat, lng, `50 km Radius für "${query.toUpperCase()}"`);
+                    }
+                })
+                .catch(err => {
+                    console.log("Geocoding fehlgeschlagen:", err);
+                });
+        }
+
         function filterMap() {
             const checkboxes = document.querySelectorAll('.filter-container input[type="checkbox"]');
             const activeFilters = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
             const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
 
             let visibleCount = 0;
-            let bounds = [];
-            let matchedItems = [];
 
             allMarkers.forEach(item => {
                 const matchesFilter = activeFilters.includes(item.status);
@@ -419,28 +455,12 @@
                 if (matchesFilter && matchesSearch) {
                     map.addLayer(item.marker);
                     visibleCount++;
-                    bounds.push([item.lat, item.lng]);
-                    matchedItems.push(item);
                 } else {
                     map.removeLayer(item.marker);
                 }
             });
 
             document.getElementById('counter').innerText = `${visibleCount} von ${allMarkers.length} angezeigt`;
-
-            // Auto-Zoom und automatischer 50 km Radius bei PLZ-/Ortssuche
-            if (searchText.length >= 2 && bounds.length > 0) {
-                map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 12, duration: 1 });
-
-                // Wenn exakt nach einer PLZ oder einem Ort gesucht wird, automatisch den 50 km Radius anwenden!
-                if (matchedItems.length > 0) {
-                    let firstMatch = matchedItems[0];
-                    analyzeRadius(firstMatch.lat, firstMatch.lng, `50 km Check für PLZ / Ort "${searchText.toUpperCase()}"`);
-                }
-            } else if (searchText === '' && allMarkers.length > 0) {
-                if (radiusCircle) map.removeLayer(radiusCircle);
-                map.setView([51.1657, 10.4515], 6);
-            }
         }
 
         document.addEventListener("DOMContentLoaded", initMap);

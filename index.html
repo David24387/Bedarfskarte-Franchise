@@ -127,8 +127,8 @@
         function initMap() {
             map = L.map('map', { zoomControl: true }).setView([51.1657, 10.4515], 6);
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap & CartoDB',
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
                 maxZoom: 19
             }).addTo(map);
 

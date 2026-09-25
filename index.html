@@ -140,7 +140,7 @@
         }
 
         function loadCsvData() {
-            Papa.parse('daten.csv', {
+            Papa.parse('./daten.csv', {
                 download: true,
                 header: false,
                 skipEmptyLines: true,
@@ -152,7 +152,7 @@
                     }
                 },
                 error: function(err) {
-                    setStatus("❌ Fehler beim Laden von daten.csv.");
+                    setStatus("❌ daten.csv konnte nicht geladen werden. Prüfe, ob die Datei im selben GitHub-Pages-Ordner wie index.html liegt.");
                 }
             });
         }
@@ -191,9 +191,9 @@
                 if (!isNaN(lat) && !isNaN(lng)) {
                     let isYes = (v) => v && ['ja','1','x','true'].includes(v.toLowerCase());
 
-                    let hasPkwReifen = isYes(row['Reifenservice']);
+                    let hasPkwReifen = isYes(row['Reifenservice']) || isYes(row['PKW']);
                     let hasPkwAuto = isYes(row['Autoservice']);
-                    let hasLkwReifen = isYes(row['Rad- Reifen Service\n(LKW)']);
+                    let hasLkwReifen = isYes(row['Rad- Reifen Service\n(LKW)']) || isYes(row['LKW']);
                     let hasLkwAuto = isYes(row['Autoservice (LKW)']);
                     let hasLkwBuehne = isYes(row['Hebebühne vorhanden\n(LKW)']);
 
@@ -240,7 +240,8 @@
                 }
             });
 
-            if (parsedCount = rawCenterData.length) {
+            const parsedCount = rawCenterData.length;
+            if (parsedCount > 0) {
                 loadCenterData(rawCenterData);
                 setStatus(`✅ <b>${parsedCount} Franchisepartner geladen!</b>`);
             } else {
